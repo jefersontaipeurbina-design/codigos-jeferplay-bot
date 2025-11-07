@@ -1,48 +1,77 @@
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 import os
+import json
 
-# Obtenemos el token de las variables de entorno
 TOKEN = os.getenv("TOKEN")
 
-# Comando /start
+# =============================
+# CLIENTES REGISTRADOS MANUALMENTE
+# =============================
+clientes = {
+    "8342506652": {
+        "username": "Je Fer Play",
+        "first_name": "Je Fer Play",
+        "is_client": True
+    }
+}
+
+# Archivo donde se guardarán los clientes nuevos
+CLIENTES_FILE = "clientes.json"
+
+# Cargar los clientes guardados en archivo (si existe)
+if os.path.exists(CLIENTES_FILE):
+    with open(CLIENTES_FILE, "r") as f:
+        guardados = json.load(f)
+        clientes.update(guardados)
+
+# =============================
+# COMANDOS DEL BOT
+# =============================
+
+# /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "👋 ¡Hola! Soy el bot oficial de Códigos Jeferplay.\nUsa /help para ver los comandos disponibles."
-    )
+    user = update.effective_user
+    user_id = str(user.id)
 
-# Comando /help
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "🧩 COMANDOS DISPONIBLES:\n"
-        "/start - Inicia el bot\n"
-        "/help - Muestra este menú de ayuda\n"
-        "/info - Muestra tu información\n"
-        "/about - Acerca del bot"
-    )
+    if user_id not in clientes:
+        clientes[user_id] = {
+            "username": user.username,
+            "first_name": user.first_name,
+            "is_client": True
+        }
+        with open(CLIENTES_FILE, "w") as f:
+            json.dump(clientes, f, indent=4)
+        await update.message.reply_text(f"👋 ¡Hola {user.first_name}! Te he registrado como cliente ✅")
+    else:
+        await update.message.reply_text(f"👋 ¡Hola {user.first_name}! Ya eres cliente 😎")
 
-# Comando /info
+# /clientes
+async def ver_clientes(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if len(clientes) == 0:
+        await update.message.reply_text("📭 No hay clientes registrados todavía.")
+    else:
+        lista = "\n".join(
+            [f"👤 {info['first_name']} (@{info['username']}) - ID: {uid}" for uid, info in clientes.items()]
+        )
+        await update.message.reply_text(f"📋 Lista de clientes registrados:\n\n{lista}")
+
+# /info
 async def info(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
+    user_id = str(user.id)
+    es_cliente = "Sí ✅" if user_id in clientes else "No ❌"
     await update.message.reply_text(
-        f"ℹ️ INFO\n"
-        f"Username: @{user.username}\n"
-        f"ID: {user.id}\n"
-        f"😎 CLIENTE: True"
+        f"ℹ️ INFO\nUsername: {user.first_name}\nID: {user.id}\n😎 CLIENTE: {es_cliente}"
     )
 
-# Comando /about
-async def about(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "📢 Bot desarrollado por Jeferplay 🎮\n¡Gracias por usarme!"
-    )
-
-# Configuración principal del bot
+# =============================
+# CONFIGURACIÓN DEL BOT
+# =============================
 app = ApplicationBuilder().token(TOKEN).build()
 app.add_handler(CommandHandler("start", start))
-app.add_handler(CommandHandler("help", help_command))
+app.add_handler(CommandHandler("clientes", ver_clientes))
 app.add_handler(CommandHandler("info", info))
-app.add_handler(CommandHandler("about", about))
 
 print("✅ BOT DE CÓDIGOS JEFERPLAY INICIADO...")
 app.run_polling()
